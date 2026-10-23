@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.sec_cache/
+.pytest_cache/
+.env
+scripts/*.log
+scripts/*.err

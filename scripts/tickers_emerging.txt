@@ -1,0 +1,7 @@
+# Emerging / high-potential names outside the top-100: Snowflake, Datadog, Coinbase.
+# Usage:
+#   python scripts/ingest_sec.py --tickers-file scripts/tickers_emerging.txt \
+#       --forms 10-K 10-Q 8-K --limit 30 --start-date 2023-10-01 --tenant emerging
+SNOW
+DDOG
+COIN

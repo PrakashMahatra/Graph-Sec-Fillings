@@ -1,0 +1,320 @@
+{
+  "n": 20,
+  "company_hit@8": 0.9,
+  "mrr": 0.9,
+  "avg_citations": 7.6,
+  "details": [
+    {
+      "q": "What voting rights do Class B shares have?",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 8,
+      "companies_cited": [
+        "BERKSHIRE HATHAWAY INC",
+        "Palantir Technologies Inc.",
+        "Alphabet Inc.",
+        "Meta Platforms, Inc.",
+        "BERKSHIRE HATHAWAY INC",
+        "Meta Platforms, Inc.",
+        "Palantir Technologies Inc.",
+        "Palantir Technologies Inc."
+      ]
+    },
+    {
+      "q": "How many votes does a Class B share carry at Meta?",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 8,
+      "companies_cited": [
+        "Meta Platforms, Inc.",
+        "Meta Platforms, Inc.",
+        "Meta Platforms, Inc.",
+        "Meta Platforms, Inc.",
+        "Meta Platforms, Inc.",
+        "Meta Platforms, Inc.",
+        "Meta Platforms, Inc.",
+        "Meta Platforms, Inc."
+      ]
+    },
+    {
+      "q": "What are the risk factors disclosed by Apple?",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 8,
+      "companies_cited": [
+        "Apple Inc.",
+        "Apple Inc.",
+        "Apple Inc.",
+        "Apple Inc.",
+        "Apple Inc.",
+        "Apple Inc.",
+        "Apple Inc.",
+        "Apple Inc."
+      ]
+    },
+    {
+      "q": "How did Microsoft's cloud revenue grow year over year?",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 8,
+      "companies_cited": [
+        "MICROSOFT CORP",
+        "MICROSOFT CORP",
+        "MICROSOFT CORP",
+        "MICROSOFT CORP",
+        "MICROSOFT CORP",
+        "MICROSOFT CORP",
+        "MICROSOFT CORP",
+        "MICROSOFT CORP"
+      ]
+    },
+    {
+      "q": "Who is the chief executive officer of JPMorgan Chase?",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 8,
+      "companies_cited": [
+        "JPMORGAN CHASE & CO",
+        "JPMORGAN CHASE & CO",
+        "JPMORGAN CHASE & CO",
+        "JPMORGAN CHASE & CO",
+        "JPMORGAN CHASE & CO",
+        "JPMORGAN CHASE & CO",
+        "JPMORGAN CHASE & CO",
+        "JPMORGAN CHASE & CO"
+      ]
+    },
+    {
+      "q": "Describe NVIDIA's data center segment revenue.",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 8,
+      "companies_cited": [
+        "NVIDIA CORP",
+        "NVIDIA CORP",
+        "NVIDIA CORP",
+        "NVIDIA CORP",
+        "NVIDIA CORP",
+        "NVIDIA CORP",
+        "NVIDIA CORP",
+        "NVIDIA CORP"
+      ]
+    },
+    {
+      "q": "What is Amazon's operating income?",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 8,
+      "companies_cited": [
+        "AMAZON COM INC",
+        "AMAZON COM INC",
+        "AMAZON COM INC",
+        "AMAZON COM INC",
+        "AMAZON COM INC",
+        "AMAZON COM INC",
+        "AMAZON COM INC",
+        "AMAZON COM INC"
+      ]
+    },
+    {
+      "q": "How much cash did Apple return to shareholders through repurchases?",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 8,
+      "companies_cited": [
+        "Apple Inc.",
+        "Apple Inc.",
+        "Apple Inc.",
+        "Apple Inc.",
+        "Apple Inc.",
+        "Apple Inc.",
+        "Apple Inc.",
+        "Apple Inc."
+      ]
+    },
+    {
+      "q": "What insurance underwriting results did Berkshire Hathaway report?",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 8,
+      "companies_cited": [
+        "BERKSHIRE HATHAWAY INC",
+        "BERKSHIRE HATHAWAY INC",
+        "BERKSHIRE HATHAWAY INC",
+        "BERKSHIRE HATHAWAY INC",
+        "BERKSHIRE HATHAWAY INC",
+        "BERKSHIRE HATHAWAY INC",
+        "BERKSHIRE HATHAWAY INC",
+        "BERKSHIRE HATHAWAY INC"
+      ]
+    },
+    {
+      "q": "What stock split did NVIDIA implement?",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 8,
+      "companies_cited": [
+        "NVIDIA CORP",
+        "NVIDIA CORP",
+        "NVIDIA CORP",
+        "NVIDIA CORP",
+        "NVIDIA CORP",
+        "NVIDIA CORP",
+        "NVIDIA CORP",
+        "NVIDIA CORP"
+      ]
+    },
+    {
+      "q": "What share repurchases has JPMorgan announced?",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 6,
+      "companies_cited": [
+        "JPMORGAN CHASE & CO",
+        "JPMORGAN CHASE & CO",
+        "JPMORGAN CHASE & CO",
+        "JPMORGAN CHASE & CO",
+        "JPMORGAN CHASE & CO",
+        "JPMORGAN CHASE & CO"
+      ]
+    },
+    {
+      "q": "How does Alphabet describe its Google Services segment?",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 8,
+      "companies_cited": [
+        "Alphabet Inc.",
+        "Alphabet Inc.",
+        "Alphabet Inc.",
+        "Alphabet Inc.",
+        "Alphabet Inc.",
+        "Alphabet Inc.",
+        "Alphabet Inc.",
+        "Alphabet Inc."
+      ]
+    },
+    {
+      "q": "What legal proceedings and litigation are discussed in Meta's filings?",
+      "rank": null,
+      "ok": false,
+      "n_citations": 2,
+      "companies_cited": [
+        "Meta Platforms, Inc.",
+        "Meta Platforms, Inc."
+      ]
+    },
+    {
+      "q": "What does AMD say about data center GPU revenue?",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 8,
+      "companies_cited": [
+        "ADVANCED MICRO DEVICES INC",
+        "ADVANCED MICRO DEVICES INC",
+        "ADVANCED MICRO DEVICES INC",
+        "ADVANCED MICRO DEVICES INC",
+        "NVIDIA CORP",
+        "ADVANCED MICRO DEVICES INC",
+        "ADVANCED MICRO DEVICES INC",
+        "NVIDIA CORP"
+      ]
+    },
+    {
+      "q": "What foundry strategy does Intel describe?",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 8,
+      "companies_cited": [
+        "INTEL CORP",
+        "INTEL CORP",
+        "INTEL CORP",
+        "INTEL CORP",
+        "INTEL CORP",
+        "INTEL CORP",
+        "INTEL CORP",
+        "INTEL CORP"
+      ]
+    },
+    {
+      "q": "How does Palantir describe its AI platform?",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 8,
+      "companies_cited": [
+        "Palantir Technologies Inc.",
+        "Palantir Technologies Inc.",
+        "Palantir Technologies Inc.",
+        "Palantir Technologies Inc.",
+        "Palantir Technologies Inc.",
+        "Palantir Technologies Inc.",
+        "Palantir Technologies Inc.",
+        "Palantir Technologies Inc."
+      ]
+    },
+    {
+      "q": "What cloud infrastructure does Oracle offer?",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 8,
+      "companies_cited": [
+        "ORACLE CORP",
+        "ORACLE CORP",
+        "ORACLE CORP",
+        "ORACLE CORP",
+        "ORACLE CORP",
+        "ORACLE CORP",
+        "ORACLE CORP",
+        "ORACLE CORP"
+      ]
+    },
+    {
+      "q": "What high-bandwidth memory does Micron produce?",
+      "rank": null,
+      "ok": false,
+      "n_citations": 8,
+      "companies_cited": [
+        "MICRON TECHNOLOGY INC",
+        "MICRON TECHNOLOGY INC",
+        "MICRON TECHNOLOGY INC",
+        "MICRON TECHNOLOGY INC",
+        "MICRON TECHNOLOGY INC",
+        "MICRON TECHNOLOGY INC",
+        "MICRON TECHNOLOGY INC",
+        "MICRON TECHNOLOGY INC"
+      ]
+    },
+    {
+      "q": "How does S&P Global describe its Ratings segment?",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 8,
+      "companies_cited": [
+        "S&P Global Inc.",
+        "S&P Global Inc.",
+        "S&P Global Inc.",
+        "S&P Global Inc.",
+        "S&P Global Inc.",
+        "S&P Global Inc.",
+        "S&P Global Inc.",
+        "S&P Global Inc."
+      ]
+    },
+    {
+      "q": "What does Eli Lilly say about Mounjaro?",
+      "rank": 1,
+      "ok": true,
+      "n_citations": 8,
+      "companies_cited": [
+        "ELI LILLY & Co",
+        "ELI LILLY & Co",
+        "ELI LILLY & Co",
+        "ELI LILLY & Co",
+        "ELI LILLY & Co",
+        "ELI LILLY & Co",
+        "ELI LILLY & Co",
+        "ELI LILLY & Co"
+      ]
+    }
+  ]
+}

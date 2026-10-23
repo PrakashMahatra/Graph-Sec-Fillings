@@ -1,0 +1,12 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+sqlalchemy>=2.0
+pydantic>=2.6
+numpy>=1.26
+requests>=2.31
+pytest>=8.0
+
+# Postgres-only stack (all free/open-source, local -- no paid APIs):
+psycopg2-binary>=2.9      # Postgres driver
+pgvector>=0.2              # pgvector SQLAlchemy type
+sentence-transformers>=2.6 # local dense embeddings (all-MiniLM-L6-v2, 384-d, CPU)

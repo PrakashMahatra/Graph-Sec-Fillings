@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FilingLens — evidence-grounded SEC Q&amp;A</title>
+<meta name="description" content="Ask questions across SEC filings. Hybrid retrieval + graph evidence + grounded citations.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="brand">
+    <div class="logo" aria-hidden="true">◈</div>
+    <div>
+      <h1>FilingLens</h1>
+      <p class="sub">evidence-grounded Q&amp;A over SEC filings</p>
+    </div>
+  </div>
+  <div class="hero-right">
+    <span id="mode" class="mode" title="answer generation mode"></span>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="views">
+  <button class="tab active" data-view="ask" role="tab" aria-selected="true">Ask</button>
+  <button class="tab" data-view="graph" role="tab" aria-selected="false">Graph</button>
+</nav>
+
+<!-- ============ ASK VIEW ============ -->
+<section id="view-ask" class="view">
+  <div class="card askbox">
+    <label class="fld-label" for="q">Your question</label>
+    <textarea id="q" enterkeyhint="go">What are the risk factors disclosed by Apple?</textarea>
+    <div class="row">
+      <label class="muted">corpus&nbsp;
+        <select id="tenant" aria-label="corpus (tenant)"></select>
+        <span id="tcount" class="muted"></span>
+      </label>
+      <span class="spacer"></span>
+      <label class="muted">company <input id="company" type="text" placeholder="optional — e.g. AAPL" size="18"></label>
+      <label class="muted">form
+        <select id="form"><option value="">any</option><option>10-K</option><option>10-Q</option><option>8-K</option></select>
+      </label>
+      <button class="ask" id="ask" onclick="ask()">Ask&nbsp;↵</button>
+    </div>
+    <div class="row"><span id="status" class="muted" role="status"></span></div>
+    <div class="chips" id="chips"></div>
+  </div>
+  <div id="out" aria-live="polite"></div>
+</section>
+
+<!-- ============ GRAPH VIEW ============ -->
+<section id="view-graph" class="view hidden">
+  <div class="card">
+    <h2>Knowledge graph</h2>
+    <p class="muted">Evidence-backed entities and relations extracted from the filings.
+       Every edge traces back to a filing chunk — no LLM-inferred links.</p>
+    <div class="row">
+      <label class="muted">corpus&nbsp;<select id="g-tenant" aria-label="corpus (tenant)"></select></label>
+      <label class="muted">type&nbsp;<select id="g-type"><option value="">all</option></select></label>
+      <label class="muted">relation&nbsp;<select id="g-relation"><option value="">all</option></select></label>
+      <label class="muted">focus&nbsp;<input id="g-focus" type="text" placeholder="e.g. Apple" size="14"></label>
+      <label class="muted">nodes&nbsp;
+        <select id="g-limit">
+          <option value="120">120</option>
+          <option value="250" selected>250</option>
+          <option value="500">500</option>
+          <option value="1000">1000</option>
+        </select>
+      </label>
+      <button class="ask" id="g-go" onclick="loadGraph()">Draw</button>
+    </div>
+    <div class="row">
+      <span id="g-status" class="muted" role="status"></span>
+      <span class="spacer"></span>
+      <span class="muted">drag nodes · scroll to zoom · click for detail</span>
+    </div>
+  </div>
+
+  <div class="card graph-card">
+    <canvas id="g-canvas"></canvas>
+    <div id="g-legend" class="g-legend"></div>
+    <p id="g-empty" class="muted g-empty hidden">No nodes match these filters.</p>
+  </div>
+
+  <div id="g-detail"></div>
+</section>
+
+<footer class="foot muted">
+  Answers cite the exact filing sections used · green cards were cited by the answer ·
+  every claim traces to <a href="https://www.sec.gov/edgar.shtml" target="_blank" rel="noopener">EDGAR</a> source text.
+</footer>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>

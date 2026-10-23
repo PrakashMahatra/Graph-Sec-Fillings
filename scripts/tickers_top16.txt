@@ -1,0 +1,23 @@
+# 16-company corpus: S&P100 top-10 by market cap + 5 AI names + S&P Global.
+# Usage:
+#   python scripts/rebuild_corpus.py --yes --tickers-file scripts/tickers_top16.txt \
+#       --forms 10-K 10-Q 8-K --limit 100 --start-date 2023-10-01 --sanity-floor 300
+# --- top 10 ---
+AAPL
+MSFT
+NVDA
+AMZN
+GOOGL
+META
+BRK-B
+LLY
+AVGO
+JPM
+# --- 5 AI companies ---
+AMD
+INTC
+PLTR
+ORCL
+MU
+# --- index provider ---
+SPGI

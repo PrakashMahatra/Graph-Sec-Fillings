@@ -1,0 +1,9 @@
+# Never bake secrets into the image -- the API passes these via compose env.
+.env
+
+__pycache__/
+*.pyc
+.sec_cache/
+.pytest_cache/
+scripts/*.log
+scripts/*.err

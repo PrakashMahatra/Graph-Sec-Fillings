@@ -1,0 +1,47 @@
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: graphrag
+      POSTGRES_USER: graphrag
+      POSTGRES_PASSWORD: graphrag_dev_only
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U graphrag"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://graphrag:graphrag_dev_only@db:5432/graphrag
+      EMBEDDER: minilm
+      EMBED_DIM: 384
+      SEC_USER_AGENT: "FilingLens demo you@example.com"
+      # Passed through from the host .env (docker compose interpolates it), so
+      # the model/key you configure is the one that actually runs -- previously
+      # the container read a stale .env baked into the image at build time.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
+    ports:
+      - "8000:8000"
+    volumes:
+      - hf-cache:/root/.cache/huggingface  # persist MiniLM weights across restarts
+      # Bind-mount source so code/UI edits are live -- `docker compose up -d`
+      # is enough, no image rebuild (and no registry access) required.
+      - ./app:/srv/app
+      - ./frontend:/srv/frontend
+
+volumes:
+  pgdata:
+  hf-cache:
