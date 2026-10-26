@@ -5,3 +5,6 @@ __pycache__/
 .env
 scripts/*.log
 scripts/*.err
+
+# Tests - not uploaded to GitHub
+tests/
