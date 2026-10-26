@@ -31,9 +31,18 @@ database with Docker first; embeddings are local `all-MiniLM-L6-v2`
 docker compose up -d            # pgvector/pg16 Postgres (+ API), first
 pip install -r requirements.txt
 cp .env.example .env   # then set SEC_USER_AGENT="Your Name your-email@example.com"
-# Lots of data: comma list and/or file, many forms, high per-company limit
+
+# Option A: 16-company S&P corpus (default data set, ~168k chunks)
+python scripts/ingest_sec.py --tickers-file scripts/tickers_top16.txt \
+    --forms 10-K 10-Q 8-K --limit 100 --tenant sec
+
+# Option B: Emerging names (Snowflake/Datadog/Coinbase) -> 'emerging' tenant (~21k chunks)
+python scripts/ingest_sec.py --tickers-file scripts/tickers_emerging.txt \
+    --forms 10-K 10-Q 8-K --limit 30 --start-date 2023-10-01 --tenant emerging
+
+# Option C: Single or comma-separated tickers
 python scripts/ingest_sec.py --ticker AAPL,MSFT,NVDA --forms 10-K 10-Q 8-K --limit 50 --tenant sec
-python scripts/ingest_sec.py --tickers-file tickers.txt --forms 10-K --limit 20 --tenant sec
+
 uvicorn app.main:app --reload
 open http://127.0.0.1:8000/            # the API serves the UI; or open frontend/index.html directly
 ```
@@ -47,7 +56,7 @@ curl -s localhost:8000/query -H 'content-type: application/json' \
   -d '{"tenant_slug":"sec","question":"What voting rights do Class B shares have?"}' | python -m json.tool
 ```
 
-Flags: `--cik`, `--ticker AAPL,MSFT`, `--tickers-file tickers.txt`,
+Flags: `--cik`, `--ticker AAPL,MSFT`, `--tickers-file scripts/tickers_top16.txt` (or `scripts/tickers_emerging.txt`),
 `--forms 10-K 10-Q 8-K S-1 DEF 14A`, `--limit N` (per company),
 `--start-date/--end-date YYYY-MM-DD`, `--tenant`, `--delay`.
 Re-runs are idempotent (same accession number = no-op), so re-running with
@@ -155,16 +164,62 @@ Four mechanisms keep answers accurate, each measurable with the eval:
   (scripts/tickers_top16.txt): **0.90 hit@8 / 0.90 MRR** — saved in
   `scripts/eval_final.json`.
 
-After changing chunking or embedding input, rebuild once:
+## Scripts: `rebuild_corpus.py` and `embed_missing.py`
+
+### `scripts/rebuild_corpus.py` — Full wipe + re-ingest + re-embed
+
+Use this when you change the chunker, embedding model, embedding input format,
+or want a clean corpus from scratch. It:
+
+1. **Truncates** `filings`, `documents`, `sections`, `chunks`, `graph_nodes`,
+   `graph_edges` (full wipe, confirmed with `--yes`)
+2. **Re-ingests** all filings from `.sec_cache` (no re-download from SEC if
+   cached)
+3. **Re-embeds** all chunks with MiniLM (commits per batch so a 150k+ chunk
+   corpus never holds one giant transaction)
+4. **Verifies** zero over-budget chunks
+5. **Reindexes** HNSW vector index
+
+Example — rebuild the 16-company S&P corpus:
 
 ```bash
 python scripts/rebuild_corpus.py --yes --tickers-file scripts/tickers_top16.txt \
     --forms 10-K 10-Q 8-K --limit 100 --start-date 2023-10-01
 ```
 
-— re-ingests from `.sec_cache`, re-embeds (commits per batch), verifies zero
-over-budget chunks, and reindexes HNSW. `python scripts/embed_missing.py`
-re-embeds only NULL-embedding chunks after a failed run.
+Example — rebuild the emerging names corpus:
+
+```bash
+python scripts/rebuild_corpus.py --yes --tickers-file scripts/tickers_emerging.txt \
+    --forms 10-K 10-Q 8-K --limit 30 --start-date 2023-10-01 --tenant emerging
+```
+
+### `scripts/embed_missing.py` — Embed only NULL-embedding chunks
+
+Use this when a previous ingestion or embedding run crashed partway through,
+leaving some chunks with `NULL` embeddings. It:
+
+- Finds chunks where `embedding IS NULL`
+- Embeds only those (skips already-embedded chunks)
+- Is idempotent and safe to re-run
+
+```bash
+python scripts/embed_missing.py
+```
+
+**When to use which:**
+
+| Situation | Command |
+|-----------|---------|
+| Changed chunker/embedding logic | `rebuild_corpus.py --yes` |
+| Changed the ticker list or date range | `rebuild_corpus.py --yes` |
+| Embedding run crashed midway | `embed_missing.py` |
+| Just want to verify corpus health | `scripts/check_counts.py` |
+
+Both scripts are **essential for day-to-day operation** — keep them in the repo.
+Any user who ingests their own tickers will need `rebuild_corpus.py` if they
+change pipeline settings, and `embed_missing.py` if a network hiccup leaves
+embeddings incomplete.
 
 ## Key engineering decisions (and why)
 
