@@ -47,6 +47,29 @@ uvicorn app.main:app --reload
 open http://127.0.0.1:8000/            # the API serves the UI; or open frontend/index.html directly
 ```
 
+## Multi-tenancy: `sec` and `emerging` in one database
+
+The same ingestion script can populate **multiple isolated tenants** in a single Postgres database. Each tenant gets its own `tenant_id`, and every row (`filings`, `chunks`, `graph_nodes`, `graph_edges`) carries it.
+
+**How it works:**
+
+1. `ingest_sec.py --tenant <slug>` — creates the tenant if it doesn't exist (`get_or_create_tenant` in `app/tenancy.py`)
+2. All ingestion writes are tagged with that `tenant_id`
+3. Every query sets `SET LOCAL app.tenant_id = :tid` so Postgres Row Level Security (RLS) enforces tenant scope at the database level — not just in application code
+
+This means you can run two separate corpora side-by-side with **zero cross-tenant leakage**:
+
+| Tenant | Data | Use case |
+|--------|------|----------|
+| `sec` | 16-company S&P (`tickers_top16.txt`) | Main corpus — 751 filings, 168k chunks |
+| `emerging` | Snowflake/Datadog/Coinbase (`tickers_emerging.txt`) | Smaller corpus — 90 filings, 21k chunks |
+
+Query any tenant independently:
+
+```bash
+curl localhost:8000/stats?tenant_slug=sec
+curl localhost:8000/stats?tenant_slug=emerging
+
 > To put the site on the public internet for free (share link or permanent
 > VM), see **[DEPLOY.md](DEPLOY.md)**.
 
@@ -157,7 +180,8 @@ Four mechanisms keep answers accurate, each measurable with the eval:
   `/query` returns `{answer, key_points, citation_ids}` synthesized ONLY
   from the numbered evidence, with citation ids validated server-side.
   No key (or any API failure) → the deterministic evidence answer stands.
-- **Golden-set eval** — `pytest tests/test_eval.py` (in-process) or
+- **Golden-set eval** — `pytest tests/test_eval.py` (not in this repo; see
+  "Tests" section below) or
   `python scripts/eval_rag.py --base-url http://127.0.0.1:8000` scores 20
   real questions as `company_hit@8` + MRR (floors tunable via
   `EVAL_MIN_HIT` / `EVAL_MIN_MRR`). Current 16-company / 3-year corpus
@@ -231,8 +255,9 @@ embeddings incomplete.
   `evidence_chunk_id` and `confidence`; nothing is written to the graph
   because a model "inferred" it without a source span.
 - **Tenant scope is never client-supplied.** It comes from server-side auth
-  context; every persistent row carries `tenant_id`; isolation has automated
-  tests (`tests/test_tenant_isolation.py`).
+  context; every persistent row carries `tenant_id`; isolation is enforced by
+  Postgres RLS + application filters (tenant isolation tests were in the
+  `tests/` folder, not included in this repo).
 - **Numbers are never LLM-corrected.** `l0%` stays `l0%` with a quality flag
   — an LLM does not get to "fix" financial or legal meaning.
 - **The system works with the LLM turned off.** Retrieval, graph traversal,
@@ -277,8 +302,25 @@ scripts/tickers_emerging.txt Snowflake/Datadog/Coinbase (`emerging` tenant)
 scripts/tickers_sp100.txt    S&P 100 list (batch ingests via rebuild/check scripts)
 frontend/index.html      minimal static UI: Ask (Q&A) + Graph (force-directed
                          knowledge-graph view) — served at / by the API
-tests/                   tenant isolation, fusion, graph extraction, chunker
 db/init.sql              full Postgres+pgvector+RLS schema
+
+# Tests (not included in this repo)
+
+The `tests/` folder (tenant isolation, fusion, graph extraction, chunker,
+rerank, eval) was removed from this repository to keep it focused on the
+application. If you want to run them locally:
+
+```bash
+mkdir tests
+# copy test files from your local dev environment
+pytest tests/ -v
+```
+
+Covers: cross-tenant retrieval/graph isolation (0 leakage), RRF fusion
+ordering, evidence-linked graph extraction, token-aware chunker budgets +
+table splitting, rerank duplicate suppression, and a 20-question retrieval
+quality eval (`tests/test_eval.py`) with env-tunable floors
+(`EVAL_MIN_HIT` / `EVAL_MIN_MRR`).
 docker-compose.yml
 ```
 
