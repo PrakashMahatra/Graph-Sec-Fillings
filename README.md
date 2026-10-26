@@ -31,12 +31,44 @@ database with Docker first; embeddings are local `all-MiniLM-L6-v2`
 docker compose up -d            # pgvector/pg16 Postgres (+ API), first
 pip install -r requirements.txt
 cp .env.example .env   # then set SEC_USER_AGENT="Your Name your-email@example.com"
-# Lots of data: comma list and/or file, many forms, high per-company limit
+
+# Option A: 16-company S&P corpus (default data set, ~168k chunks)
+python scripts/ingest_sec.py --tickers-file scripts/tickers_top16.txt \
+    --forms 10-K 10-Q 8-K --limit 100 --tenant sec
+
+# Option B: Emerging names (Snowflake/Datadog/Coinbase) -> 'emerging' tenant (~21k chunks)
+python scripts/ingest_sec.py --tickers-file scripts/tickers_emerging.txt \
+    --forms 10-K 10-Q 8-K --limit 30 --start-date 2023-10-01 --tenant emerging
+
+# Option C: Single or comma-separated tickers
 python scripts/ingest_sec.py --ticker AAPL,MSFT,NVDA --forms 10-K 10-Q 8-K --limit 50 --tenant sec
-python scripts/ingest_sec.py --tickers-file tickers.txt --forms 10-K --limit 20 --tenant sec
+
 uvicorn app.main:app --reload
 open http://127.0.0.1:8000/            # the API serves the UI; or open frontend/index.html directly
 ```
+
+## Multi-tenancy: `sec` and `emerging` in one database
+
+The same ingestion script can populate **multiple isolated tenants** in a single Postgres database. Each tenant gets its own `tenant_id`, and every row (`filings`, `chunks`, `graph_nodes`, `graph_edges`) carries it.
+
+**How it works:**
+
+1. `ingest_sec.py --tenant <slug>` — creates the tenant if it doesn't exist (`get_or_create_tenant` in `app/tenancy.py`)
+2. All ingestion writes are tagged with that `tenant_id`
+3. Every query sets `SET LOCAL app.tenant_id = :tid` so Postgres Row Level Security (RLS) enforces tenant scope at the database level — not just in application code
+
+This means you can run two separate corpora side-by-side with **zero cross-tenant leakage**:
+
+| Tenant | Data | Use case |
+|--------|------|----------|
+| `sec` | 16-company S&P (`tickers_top16.txt`) | Main corpus — 751 filings, 168k chunks |
+| `emerging` | Snowflake/Datadog/Coinbase (`tickers_emerging.txt`) | Smaller corpus — 90 filings, 21k chunks |
+
+Query any tenant independently:
+
+```bash
+curl localhost:8000/stats?tenant_slug=sec
+curl localhost:8000/stats?tenant_slug=emerging
 
 > To put the site on the public internet for free (share link or permanent
 > VM), see **[DEPLOY.md](DEPLOY.md)**.
@@ -47,7 +79,7 @@ curl -s localhost:8000/query -H 'content-type: application/json' \
   -d '{"tenant_slug":"sec","question":"What voting rights do Class B shares have?"}' | python -m json.tool
 ```
 
-Flags: `--cik`, `--ticker AAPL,MSFT`, `--tickers-file tickers.txt`,
+Flags: `--cik`, `--ticker AAPL,MSFT`, `--tickers-file scripts/tickers_top16.txt` (or `scripts/tickers_emerging.txt`),
 `--forms 10-K 10-Q 8-K S-1 DEF 14A`, `--limit N` (per company),
 `--start-date/--end-date YYYY-MM-DD`, `--tenant`, `--delay`.
 Re-runs are idempotent (same accession number = no-op), so re-running with
@@ -148,23 +180,70 @@ Four mechanisms keep answers accurate, each measurable with the eval:
   `/query` returns `{answer, key_points, citation_ids}` synthesized ONLY
   from the numbered evidence, with citation ids validated server-side.
   No key (or any API failure) → the deterministic evidence answer stands.
-- **Golden-set eval** — `pytest tests/test_eval.py` (in-process) or
+- **Golden-set eval** — `pytest tests/test_eval.py` (not in this repo; see
+  "Tests" section below) or
   `python scripts/eval_rag.py --base-url http://127.0.0.1:8000` scores 20
   real questions as `company_hit@8` + MRR (floors tunable via
   `EVAL_MIN_HIT` / `EVAL_MIN_MRR`). Current 16-company / 3-year corpus
   (scripts/tickers_top16.txt): **0.90 hit@8 / 0.90 MRR** — saved in
   `scripts/eval_final.json`.
 
-After changing chunking or embedding input, rebuild once:
+## Scripts: `rebuild_corpus.py` and `embed_missing.py`
+
+### `scripts/rebuild_corpus.py` — Full wipe + re-ingest + re-embed
+
+Use this when you change the chunker, embedding model, embedding input format,
+or want a clean corpus from scratch. It:
+
+1. **Truncates** `filings`, `documents`, `sections`, `chunks`, `graph_nodes`,
+   `graph_edges` (full wipe, confirmed with `--yes`)
+2. **Re-ingests** all filings from `.sec_cache` (no re-download from SEC if
+   cached)
+3. **Re-embeds** all chunks with MiniLM (commits per batch so a 150k+ chunk
+   corpus never holds one giant transaction)
+4. **Verifies** zero over-budget chunks
+5. **Reindexes** HNSW vector index
+
+Example — rebuild the 16-company S&P corpus:
 
 ```bash
 python scripts/rebuild_corpus.py --yes --tickers-file scripts/tickers_top16.txt \
     --forms 10-K 10-Q 8-K --limit 100 --start-date 2023-10-01
 ```
 
-— re-ingests from `.sec_cache`, re-embeds (commits per batch), verifies zero
-over-budget chunks, and reindexes HNSW. `python scripts/embed_missing.py`
-re-embeds only NULL-embedding chunks after a failed run.
+Example — rebuild the emerging names corpus:
+
+```bash
+python scripts/rebuild_corpus.py --yes --tickers-file scripts/tickers_emerging.txt \
+    --forms 10-K 10-Q 8-K --limit 30 --start-date 2023-10-01 --tenant emerging
+```
+
+### `scripts/embed_missing.py` — Embed only NULL-embedding chunks
+
+Use this when a previous ingestion or embedding run crashed partway through,
+leaving some chunks with `NULL` embeddings. It:
+
+- Finds chunks where `embedding IS NULL`
+- Embeds only those (skips already-embedded chunks)
+- Is idempotent and safe to re-run
+
+```bash
+python scripts/embed_missing.py
+```
+
+**When to use which:**
+
+| Situation | Command |
+|-----------|---------|
+| Changed chunker/embedding logic | `rebuild_corpus.py --yes` |
+| Changed the ticker list or date range | `rebuild_corpus.py --yes` |
+| Embedding run crashed midway | `embed_missing.py` |
+| Just want to verify corpus health | `scripts/check_counts.py` |
+
+Both scripts are **essential for day-to-day operation** — keep them in the repo.
+Any user who ingests their own tickers will need `rebuild_corpus.py` if they
+change pipeline settings, and `embed_missing.py` if a network hiccup leaves
+embeddings incomplete.
 
 ## Key engineering decisions (and why)
 
@@ -176,8 +255,9 @@ re-embeds only NULL-embedding chunks after a failed run.
   `evidence_chunk_id` and `confidence`; nothing is written to the graph
   because a model "inferred" it without a source span.
 - **Tenant scope is never client-supplied.** It comes from server-side auth
-  context; every persistent row carries `tenant_id`; isolation has automated
-  tests (`tests/test_tenant_isolation.py`).
+  context; every persistent row carries `tenant_id`; isolation is enforced by
+  Postgres RLS + application filters (tenant isolation tests were in the
+  `tests/` folder, not included in this repo).
 - **Numbers are never LLM-corrected.** `l0%` stays `l0%` with a quality flag
   — an LLM does not get to "fix" financial or legal meaning.
 - **The system works with the LLM turned off.** Retrieval, graph traversal,
@@ -222,8 +302,25 @@ scripts/tickers_emerging.txt Snowflake/Datadog/Coinbase (`emerging` tenant)
 scripts/tickers_sp100.txt    S&P 100 list (batch ingests via rebuild/check scripts)
 frontend/index.html      minimal static UI: Ask (Q&A) + Graph (force-directed
                          knowledge-graph view) — served at / by the API
-tests/                   tenant isolation, fusion, graph extraction, chunker
 db/init.sql              full Postgres+pgvector+RLS schema
+
+# Tests (not included in this repo)
+
+The `tests/` folder (tenant isolation, fusion, graph extraction, chunker,
+rerank, eval) was removed from this repository to keep it focused on the
+application. If you want to run them locally:
+
+```bash
+mkdir tests
+# copy test files from your local dev environment
+pytest tests/ -v
+```
+
+Covers: cross-tenant retrieval/graph isolation (0 leakage), RRF fusion
+ordering, evidence-linked graph extraction, token-aware chunker budgets +
+table splitting, rerank duplicate suppression, and a 20-question retrieval
+quality eval (`tests/test_eval.py`) with env-tunable floors
+(`EVAL_MIN_HIT` / `EVAL_MIN_MRR`).
 docker-compose.yml
 ```
 
