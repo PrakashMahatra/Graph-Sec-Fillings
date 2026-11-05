@@ -1,15 +1,4 @@
-"""
-Thin client for SEC's public, key-free APIs (data.sec.gov / www.sec.gov).
-
-SEC documents a 10 requests/second fair-access ceiling and requires a
-declared User-Agent for scripted access -- both are enforced here.
-Responses are cached to disk so re-running ingestion doesn't re-hit SEC and
-ingestion stays idempotent.
-
-This module needs outbound internet to sec.gov, which the sandbox this
-repo may have been generated in does not have -- run it on your own
-machine (`python scripts/ingest_sec.py --cik <CIK>`) to pull real filings.
-"""
+# Thin SEC API client with throttling, caching, and local file-based ingestion support.
 from __future__ import annotations
 import hashlib
 import json
@@ -83,9 +72,7 @@ def get_submissions(cik: str) -> dict:
 
 
 def get_companyfacts(cik: str) -> dict:
-    """XBRL structured facts (us-gaap tags with values per period). Payloads
-    are large (MBs) but cached like everything else -- first call per CIK
-    hits sec.gov, afterwards offline."""
+    # XBRL structured facts (us-gaap tags with values per period). Payloads are large (MBs) but cached like everything else -- first call per CIK hits sec.gov, afterwards offline.
     cik = cik.zfill(10)
     return get_json(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json")
 
@@ -127,10 +114,7 @@ def list_all_filings(
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> list[dict]:
-    """Bulk-aware listing: walks `filings.recent` + paginated `filings.files[]`
-    archives (oldest submissions) so '--limit 500' actually returns 500.
-    Dates are 'YYYY-MM-DD' strings; comparison is lexicographic (safe ISO format).
-    Returns newest-first, capped at `limit`."""
+    # Bulk-aware listing: walks `filings.recent` + paginated `filings.files[]` archives (oldest submissions) so '--limit 500' actually returns 500. Dates are 'YYYY-MM-DD' strings; comparison is lexicographic (safe ISO format). Returns newest-first, capped at `limit`.
     cik = cik.zfill(10)
     sub = get_submissions(cik)
     company_name = sub.get("name")
@@ -153,11 +137,10 @@ def list_all_filings(
             archived = get_json(url)
         except Exception:
             continue
-        # archived files have varying shapes: either the same `recent`-style
-        # arrays at top level or nested under filings. Handle both.
+        # Archived files may expose recent arrays at the top level or under filings.recent.
         block = archived
         if "filings" in archived and isinstance(archived["filings"], dict):
-            # some archives nest under filings.recent
+            # Some archives nest recent filings under filings.recent.
             block = archived["filings"].get("recent", archived)
         out.extend(_collect_from_block(cik, block, company_name, ticker, set(form_types), start_date, end_date))
     return out[:limit]

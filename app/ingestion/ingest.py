@@ -13,11 +13,7 @@ EMBED_BATCH = 64  # MiniLM batch size for bulk loads (CPU-friendly)
 
 
 def embed_text(text: str, metadata: dict | None) -> str:
-    """Embedding input = contextual header + chunk text. The header (company |
-    form | filed date | section) is stored per-chunk in metadata_json at
-    ingest time, prepended only at embed time -- so `text` (and the lexical
-    index over it) stays clean for display while the embedder sees where the
-    chunk came from (Anthropic-style contextual headers)."""
+    # Embedding input = contextual header + chunk text. The header (company | form | filed date | section) is stored per-chunk in metadata_json at ingest time, prepended only at embed time -- so `text` (and the lexical index over it) stays clean for display while the embedder sees where the chunk came from (Anthropic-style contextual headers).
     ctx = (metadata or {}).get("context")
     return f"{ctx}\n\n{text}" if ctx else text
 
@@ -51,15 +47,7 @@ def get_or_create_node(db, tenant_id: str, node_type: str, canonical_name: str, 
 
 def ingest_filing(tenant_id: str, filing_meta: dict, raw_text: str, is_html: bool | None = None,
                 skip_embedding_rebuild: bool = False) -> str:
-    """
-    filing_meta: {company_name, cik, ticker, form_type, accession_number,
-                   filing_date, period_end_date, filing_url}
-    Idempotent: (tenant_id, accession_number) is unique -- re-ingesting the
-    same accession number is a no-op that returns the existing filing id.
-    skip_embedding_rebuild=True defers embedding this filing's chunks (leave
-    NULL) -- use for bulk loads, then call rebuild_embeddings(only_missing=True)
-    once at the end.
-    """
+    # filing_meta: {company_name, cik, ticker, form_type, accession_number, filing_date, period_end_date, filing_url} Idempotent: (tenant_id, accession_number) is unique -- re-ingesting the same accession number is a no-op that returns the existing filing id. skip_embedding_rebuild=True defers embedding this filing's chunks (leave NULL) -- use for bulk loads, then call rebuild_embeddings(only_missing=True) once at the end.
     with session_scope() as db:
         existing = db.execute(
             select(Filing).where(
@@ -74,8 +62,7 @@ def ingest_filing(tenant_id: str, filing_meta: dict, raw_text: str, is_html: boo
             db, filing_meta["company_name"], filing_meta.get("cik"), filing_meta.get("ticker")
         )
 
-        # temporal lineage: does this filing supersede an earlier one of the
-        # same form_type for the same company/tenant?
+        # Check whether this filing supersedes an earlier filing of the same form type for the same company.
         prior = db.execute(
             select(Filing)
             .where(Filing.tenant_id == tenant_id, Filing.company_id == company.id,
@@ -141,10 +128,7 @@ def ingest_filing(tenant_id: str, filing_meta: dict, raw_text: str, is_html: boo
 
         db.flush()
 
-        # --- embeddings: local MiniLM (pretrained, 384-d), batched ---
-        # For bulk loads pass skip_embedding_rebuild=True and call
-        # rebuild_embeddings(only_missing=True) once at the end; otherwise
-        # embed inline (batched, cheap) so progress survives a restart.
+        # Batch local MiniLM embeddings; skip the final rebuild for bulk loads and do it once at the end.
         if not skip_embedding_rebuild:
             embedder = get_embedder()
             embedder.fit([])  # no-op: ensures model loads
@@ -154,7 +138,7 @@ def ingest_filing(tenant_id: str, filing_meta: dict, raw_text: str, is_html: boo
                 for chunk, vec in zip(batch_rows, vectors):
                     chunk.embedding = vec
 
-        # --- evidence-linked graph extraction ---
+        # Extract evidence-backed graph facts from each chunk.
         for chunk in all_chunk_rows:
             facts = extract_facts(chunk.text, self_company_name=filing_meta["company_name"])
             for fact in facts:
@@ -168,7 +152,7 @@ def ingest_filing(tenant_id: str, filing_meta: dict, raw_text: str, is_html: boo
                 )
                 db.add(edge)
 
-        # Company --FILED--> Filing edge (always, evidence = the filing itself)
+        # Company -> Filing edge; the filing itself is the evidence source.
         company_node = get_or_create_node(db, tenant_id, "Company", filing_meta["company_name"])
         filing_node = get_or_create_node(db, tenant_id, "Filing", filing_meta["accession_number"],
                                           {"form_type": filing_meta["form_type"], "filing_date": filing_meta["filing_date"]})
@@ -188,11 +172,7 @@ def ingest_filing(tenant_id: str, filing_meta: dict, raw_text: str, is_html: boo
 
 
 def rebuild_embeddings(only_missing: bool = False, batch_size: int = 2000) -> int:
-    """(Re-)embed chunks with MiniLM. only_missing=True embeds only chunks
-    whose embedding is NULL (after bulk loads with skip_embedding_rebuild);
-    only_missing=False re-embeds everything (after chunker/context changes).
-    Streams ids in batches so a 150k+ chunk corpus never has to fit in
-    memory, and prints progress. Returns number of chunks embedded."""
+    # (Re-)embed chunks with MiniLM. only_missing=True embeds only chunks whose embedding is NULL (after bulk loads with skip_embedding_rebuild); only_missing=False re-embeds everything (after chunker/context changes). Streams ids in batches so a 150k+ chunk corpus never has to fit in memory, and prints progress. Returns number of chunks embedded.
     with session_scope() as db:
         ids_q = select(Chunk.id)
         if only_missing:
@@ -210,10 +190,7 @@ def rebuild_embeddings(only_missing: bool = False, batch_size: int = 2000) -> in
             vectors = embedder.embed([embed_text(c.text, c.metadata_json) for c in rows])
             for chunk, vec in zip(rows, vectors):
                 chunk.embedding = vec
-            # Commit per batch: sessions run with autoflush=False, so without
-            # this every update piles up until ONE giant executemany at the
-            # end (~700MB for 150k rows) -- which gets the connection killed
-            # by Postgres and rolls back ALL embeddings.
+            # Commit per batch to avoid a giant executemany that can kill the Postgres connection.
             db.commit()
             done += len(rows)
             print(f"  embedded {done}/{len(ids)} chunks", flush=True)

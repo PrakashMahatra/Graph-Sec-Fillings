@@ -1,9 +1,4 @@
-"""
-Lexical retrieval layer (Postgres-only).
-
-Real full-text search -- `search_tsv @@ plainto_tsquery` + `ts_rank`,
-GIN-indexed (see db/init.sql). Exact, fast, server-side, tenant-scoped.
-"""
+# Lexical retrieval uses PostgreSQL full-text search and GIN indexes; tenant-scoped and server-side.
 from __future__ import annotations
 from dataclasses import dataclass
 
@@ -18,8 +13,7 @@ class LexicalHit:
 
 def lexical_search(db, tenant_id: str, query: str, top_k: int,
                    filters: dict | None = None) -> list[LexicalHit]:
-    """Optional `filters` = {company_id, form_type, date_from, date_to}
-    (all None-tolerant) -> scoped to specific filings via documents/join."""
+    # Optional `filters` = {company_id, form_type, date_from, date_to} (all None-tolerant) -> scoped to specific filings via documents/join.
     joins, conds, params = "", "", {"q": query, "tid": tenant_id, "k": top_k}
     if filters:
         joins = (" JOIN documents d ON d.id = chunks.document_id"

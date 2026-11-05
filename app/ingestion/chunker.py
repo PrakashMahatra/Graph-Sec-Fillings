@@ -1,19 +1,4 @@
-"""
-Splits filing text into overlapping chunks bounded by the *embedding model's*
-real tokenizer (WordPiece, all-MiniLM-L6-v2) -- not whitespace words.
-
-Why: MiniLM silently truncates every input at max_seq_length=256 WordPiece
-tokens (incl. [CLS]/[SEP]). The old word-based budget (220 whitespace words
-~= 280-320 WordPiece tokens) meant the tail ~10-15% of every chunk never
-reached its embedding, and unbounded table chunks (largest: 25,439 words)
-were >99% truncated. Counting real tokens makes the budget exact.
-
-Budget math (WordPiece tokens):
-    contextual header (company | form | date | section) <= CONTEXT_CAP (48)
-  + chunk text                                          <= HARD_CAP   (206)
-  + [CLS]/[SEP]                                          = 2
-  = 256 (embedder max_seq_length)
-"""
+# Chunk filing text using the embedding model's real WordPiece budget.
 from __future__ import annotations
 
 import bisect
@@ -46,9 +31,7 @@ def count_tokens(text: str) -> int:
 
 
 def _word_token_counts(words: list[str]) -> list[int]:
-    """Per-word WordPiece counts. WordPiece never merges across whitespace,
-    so summing these equals tokenizing the joined text -- while letting us
-    pick boundaries by binary search instead of re-tokenizing repeatedly."""
+    """Per-word WordPiece counts let us split on token boundaries without re-tokenizing the whole string."""
     enc = _get_tokenizer()(words, is_split_into_words=True, add_special_tokens=False)
     counts = [0] * len(words)
     for w in enc.word_ids():
@@ -93,23 +76,20 @@ def chunk_section_text(text: str, page_start: int = 1, page_end: int = 1) -> lis
     chunks: list[ChunkCandidate] = []
     start = 0
     while start < n:
-        # widest end whose WordPiece total stays within TARGET_TOKENS
+        # Use the widest boundary that keeps the chunk under TARGET_TOKENS.
         cap = prefix[start] + TARGET_TOKENS
         end = bisect.bisect_right(prefix, cap, lo=start + 1, hi=n + 1) - 1
         if end <= start:
             end = start + 1
         piece = " ".join(words[start:end])
         tok_count = count_tokens(piece)
-        # Defensive: per-word sums == joined counts for WordPiece, so this
-        # should never fire -- but never emit an over-budget chunk.
+        # Defensive fallback: if a token count still exceeds the cap, trim until it fits.
         while tok_count > HARD_CAP and end - start > 1:
             end = start + max(1, (end - start) * 3 // 4)
             piece = " ".join(words[start:end])
             tok_count = count_tokens(piece)
         if tok_count > HARD_CAP:
-            # A single pathological "word" (underscore rules, raw URLs,
-            # XBRL ids) that can't be shrunk by word count -- unembeddable
-            # noise, so drop it rather than silently truncate its embedding.
+            # Drop pathological single-word chunks that cannot be shrunk without truncating the embedding.
             logger.warning("dropping unembeddable chunk (%d tokens, %d chars)",
                            tok_count, len(piece))
         else:
@@ -119,8 +99,7 @@ def chunk_section_text(text: str, page_start: int = 1, page_end: int = 1) -> lis
             ))
         if end == n:
             break
-        # next window starts ~OVERLAP_TOKENS back so a fact split across the
-        # boundary isn't lost to either chunk
+        # Start the next chunk a bit back so a fact split at the boundary is not lost.
         back = bisect.bisect_left(prefix, prefix[end] - OVERLAP_TOKENS, lo=start + 1)
         start = back if back > start else start + 1
     return chunks
@@ -135,10 +114,7 @@ def _is_separator_line(line: str) -> bool:
 
 
 def chunk_table_markdown(table_md: str) -> list[ChunkCandidate]:
-    """Tables stay whole when they fit the budget. Oversized tables are split
-    into row groups that repeat the header rows, so every piece is embeddable
-    and still interpretable (previously >99% of a large table was truncated
-    out of its embedding)."""
+    """Tables stay whole when they fit the budget; oversized tables are split into row groups that repeat the header."""
     lines = [l for l in table_md.splitlines() if l.strip()]
     if not lines:
         return []
@@ -153,7 +129,7 @@ def chunk_table_markdown(table_md: str) -> list[ChunkCandidate]:
     if not rows:
         return chunk_section_text(table_md)  # degenerate oversized header
 
-    # single batched tokenization for header + all rows
+    # Batch-tokenize the header and row groups together.
     enc = _get_tokenizer()(header_lines + rows, add_special_tokens=False)
     costs = [len(ids) for ids in enc["input_ids"]]
     header_cost = sum(costs[:n_head])
@@ -173,7 +149,7 @@ def chunk_table_markdown(table_md: str) -> list[ChunkCandidate]:
         text = "\n".join(header_lines + group)
         tc = count_tokens(text)
         if tc > HARD_CAP:
-            # pathological single row wider than the budget: word-split it
+            # Pathological rows are word-split to keep the chunk embeddable.
             logger.warning("table row group exceeded %d tokens; word-splitting", HARD_CAP)
             out.extend(chunk_section_text(text))
         else:

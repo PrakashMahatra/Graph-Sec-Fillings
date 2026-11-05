@@ -1,11 +1,4 @@
-"""Re-run embedding for chunks whose embedding is NULL.
-
-Use after a crashed or rolled-back embed transaction (rebuild_embeddings
-commits per batch now, but an older run may have lost everything). Safe to
-re-run: only NULL-embedding chunks are touched.
-
-    python scripts/embed_missing.py
-"""
+# Re-run embedding for chunks whose embedding is NULL. Use after a crashed or rolled-back embed transaction (rebuild_embeddings commits per batch now, but an older run may have lost everything). Safe to re-run: only NULL-embedding chunks are touched. python scripts/embed_missing.py
 import os
 import sys
 from pathlib import Path

@@ -1,20 +1,4 @@
-"""Full corpus rebuild: wipe content tables, re-ingest from .sec_cache with
-the CURRENT pipeline (token-aware chunker + contextual headers + fixed EDGAR
-parser), re-embed everything, verify the token budget, refresh the HNSW
-index.
-
-Run this whenever chunk sizing, embedding input, or the parser changes --
-old embeddings were produced under the old rules and are incompatible.
-
-Usage:
-    python scripts/rebuild_corpus.py --yes
-    python scripts/rebuild_corpus.py --yes --skip-ingest   # verify-only
-
-Keeps tenants/companies/users; wipes filings/documents/sections/chunks/
-graph_nodes/graph_edges for ALL tenants (single-tenant demo). SEC traffic
-served from .sec_cache where warm; only cache misses hit sec.gov (10 req/s
-ceiling enforced by sec_client).
-"""
+# Full corpus rebuild script: wipe content tables, re-ingest from cache, re-embed, and verify the token budget.
 import argparse
 import os
 import subprocess

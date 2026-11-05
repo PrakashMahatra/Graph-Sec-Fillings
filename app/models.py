@@ -20,7 +20,7 @@ def now():
 
 
 def _pk():
-    # Native UUID PK (matches db/init.sql UUID + gen_random_uuid()).
+    # Native UUID PK matches db/init.sql and uses gen_random_uuid().
     return Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
 
@@ -33,7 +33,7 @@ def _uuid_fk(target, nullable=True):
 
 
 def _uuid_nullable():
-    # Nullable UUID WITHOUT a ForeignKey (self-refs, duplicate_of).
+    # Nullable UUID without a ForeignKey for self-references and duplicate_of.
     return Column(PG_UUID(as_uuid=True), nullable=True)
 
 
@@ -141,15 +141,14 @@ class Chunk(Base):
 
     __table_args__ = (
         Index("ix_chunks_tenant_doc", "tenant_id", "document_id"),
-        # pgvector HNSW ANN index -- cosine distance over the 384-d MiniLM
-        # embeddings, declared here so create_all() owns every index.
+        # pgvector HNSW ANN index over the 384-d MiniLM embeddings; create_all owns every index.
         Index(
             "chunks_embedding_idx",
             "embedding",
             postgresql_using="hnsw",
             postgresql_ops={"embedding": "vector_cosine_ops"},
         ),
-        # GIN full-text index over the generated `search_tsv` column.
+        # GIN full-text index over the generated search_tsv column.
         Index("chunks_tsv_idx", "search_tsv", postgresql_using="gin"),
     )
 
@@ -182,8 +181,7 @@ class GraphEdge(Base):
     filing_id = _uuid_fk("filings.id", nullable=True)
     evidence_chunk_id = _uuid_fk("chunks.id", nullable=True)
     properties = _jsonb(dict)
-    # Every edge MUST originate from an extraction rule + evidence span --
-    # never written because a model "felt" the relation was true.
+    # Every edge must come from an extraction rule plus evidence, never from a model's intuition.
     confidence = Column(Float, default=1.0)
 
     __table_args__ = (

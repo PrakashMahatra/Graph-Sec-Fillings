@@ -1,14 +1,4 @@
-"""
-Turns a raw filing document (HTML or already-plain text) into an ordered
-list of sections, each with heading + page-ish locators + body text, and
-converts any HTML tables into *both* a Markdown rendering and a structured
-row/column form -- the spec requires both when comparisons need them (e.g.
-diffing a voting-rights table across filings).
-
-Kept dependency-free (stdlib `html.parser` + `re`) rather than pulling in
-BeautifulSoup, since the transform needed here (strip tags, keep structure
-markers) is simple enough to be worth keeping the dependency list short.
-"""
+# Parse raw filings into sections and tables without adding a third-party HTML dependency.
 from __future__ import annotations
 import re
 from dataclasses import dataclass, field
@@ -17,9 +7,7 @@ from html.parser import HTMLParser
 _HEADING_TAGS = {"h1", "h2", "h3", "h4"}
 _BLOCK_TAGS = {"p", "div", "br", "li", "tr"}
 
-# Content that must never reach chunk text: scripts/styles, <head> metadata,
-# and hidden iXBRL header blocks -- otherwise every filing's first chunks are
-# seeded with raw XBRL like "aapl-20250927 false 2025 FY 0000320193 P1Y ...".
+# Strip scripts, styles, metadata, and hidden iXBRL blocks before chunking.
 _JUNK_TAGS = ("script", "style", "head")
 
 
@@ -130,11 +118,7 @@ def _rows_to_markdown(rows: list[list[str]]) -> str:
     return "\n".join(out)
 
 
-# EDGAR HTML almost never uses <h1>-<h4> for the Item/Part structure -- the
-# headings exist only as text lines like "Item 1A. Risk Factors" or
-# "PART II". Splitting on those lines is what gives sections (and citations,
-# and contextual headers) real Item-level granularity instead of one giant
-# "Document" section per filing.
+# Item and Part lines are split into their own sections so citations and contextual headers stay granular.
 _ITEM_LINE = re.compile(r"(?i)^item\s+\d{1,2}[a-z]?\s*[.)\-–—:]?\s*\S")
 _PART_LINE = re.compile(r"(?i)^part\s+[ivx]{1,4}\s*[.)\-–—:]?(?:\s+\S.*)?$")
 
@@ -147,9 +131,7 @@ def _is_item_heading_line(line: str) -> bool:
 
 
 def _split_on_item_headings(section: ParsedSection) -> list[ParsedSection]:
-    """Second pass: split one section's text on Item/Part heading lines.
-    The heading line is kept IN its section's body as well, so full-text
-    search over the heading words ("risk factors") still matches."""
+    """Second pass: split one section on Item/Part heading lines while keeping the heading text in the section body."""
     lines = section.text.splitlines()
     marks = [(i, l.strip()) for i, l in enumerate(lines) if _is_item_heading_line(l)]
     if not marks:
@@ -178,7 +160,7 @@ def parse_document(raw: str, is_html: bool | None = None) -> list[ParsedSection]
         is_html = "<" in raw and ">" in raw and re.search(r"<\s*\w+[^>]*>", raw)
 
     if not is_html:
-        # Plain text: split on markdown-style headings or ALL-CAPS lines.
+        # Plain text sections split on markdown headings or all-caps headings.
         lines = raw.splitlines()
         sections, cur_heading, cur_body, ordinal = [], "Document", [], 0
         for line in lines:

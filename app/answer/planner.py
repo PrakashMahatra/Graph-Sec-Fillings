@@ -1,10 +1,4 @@
-"""
-Rule-based query decomposition. No LLM required to decide *what kind* of
-question this is -- keyword/entity matching against known graph nodes is
-enough to decide whether to add a graph hop (peer comparison, "traced
-across filings") on top of hybrid retrieval, and that decision needs to be
-deterministic and inspectable, not left to a model's mood.
-"""
+# Rule-based query decomposition; graph hops are decided from known entities and keywords, not model mood.
 from __future__ import annotations
 from dataclasses import dataclass, field
 

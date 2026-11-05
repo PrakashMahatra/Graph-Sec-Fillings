@@ -1,9 +1,4 @@
-"""
-Postgres-only embedding layer: local dense embeddings via
-sentence-transformers `all-MiniLM-L6-v2` (384-d, CPU/GPU, no API key, free).
-First use downloads weights (~90MB) to the HF cache; afterwards offline.
-`fit()` is a no-op (pretrained) kept for API compatibility.
-"""
+# Postgres-only embedding layer uses local sentence-transformers MiniLM embeddings and a no-op fit() for compatibility.
 from __future__ import annotations
 import logging
 from typing import Protocol
@@ -32,8 +27,7 @@ class MiniLMEmbedder:
         return self._model
 
     def _warn_if_truncating(self, texts: list[str], model) -> None:
-        """Belt-and-braces observability: log (once per process) when an input
-        exceeds max_seq_length -- its tail would be silently dropped."""
+        # Belt-and-braces observability: log (once per process) when an input exceeds max_seq_length -- its tail would be silently dropped.
         if self._warned_truncation:
             return
         try:
@@ -69,9 +63,7 @@ _embedder: MiniLMEmbedder | None = None
 
 
 def get_embedder() -> Embedder:
-    """Process-wide singleton. Loading SentenceTransformer from disk on every
-    query added ~1s of dead weight per request; the weights are immutable, so
-    one shared instance is safe and much faster."""
+    # Process-wide singleton. Loading SentenceTransformer from disk on every query added ~1s of dead weight per request; the weights are immutable, so one shared instance is safe and much faster.
     global _embedder
     if _embedder is None:
         _embedder = MiniLMEmbedder()

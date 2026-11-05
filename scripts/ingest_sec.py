@@ -1,13 +1,4 @@
-"""
-Real bulk ingestion from SEC EDGAR (free, key-free).
-Needs outbound internet to data.sec.gov / www.sec.gov.
-
-Usage (lots of data):
-    python scripts/ingest_sec.py --ticker AAPL,MSFT,NVDA --forms 10-K 10-Q 8-K --limit 50
-    python scripts/ingest_sec.py --cik 0000320193 --forms 10-K 10-Q 8-K S-1 DEF 14A --limit 100
-    python scripts/ingest_sec.py --tickers-file tickers.txt --forms 10-K --limit 20 --tenant sec
-    python scripts/ingest_sec.py --ticker AAPL --forms 10-K --limit 50 --start-date 2020-01-01
-"""
+# Bulk SEC EDGAR ingestion script for free key-free filing imports.
 import argparse
 import sys
 import time
@@ -32,8 +23,7 @@ def parse_targets(args) -> list[str]:
         for line in p.read_text().splitlines():
             line = line.strip()
             if line and not line.startswith("#"):
-                targets.append(line.split()[0])  # allow "AAPL # comment" lines
-    # de-dup preserving order
+                targets.append(line.split()[0])  # allow inline comments after a ticker
     seen, out = set(), []
     for t in targets:
         k = t.upper()

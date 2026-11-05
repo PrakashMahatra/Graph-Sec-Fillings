@@ -1,13 +1,4 @@
-"""
-Deterministic, inspectable multi-hop graph traversal.
-
-Not a black box: `traverse` does plain BFS over `graph_edges`, tenant-scoped,
-optionally filtered by relation type and temporal validity (`valid_from`),
-and returns full paths with each edge's evidence_chunk_id attached -- so
-"trace how X changed" queries can literally walk Filing --SUPERSEDES-->
-Filing chains, or Company --PEER_OF--> Company --DESCRIBES--> SecurityClass
-fan-outs, and cite the exact evidence for every hop.
-"""
+# Deterministic, inspectable multi-hop graph traversal. Not a black box: `traverse` does plain BFS over `graph_edges`, tenant-scoped, optionally filtered by relation type and temporal validity (`valid_from`), and returns full paths with each edge's evidence_chunk_id attached -- so "trace how X changed" queries can literally walk Filing --SUPERSEDES--> Filing chains, or Company --PEER_OF--> Company --DESCRIBES--> SecurityClass fan-outs, and cite the exact evidence for every hop.
 from __future__ import annotations
 from dataclasses import dataclass, field
 
@@ -39,8 +30,7 @@ def traverse(
     relation_types: list[str] | None = None,
     max_hops: int = MAX_GRAPH_HOPS,
 ) -> list[GraphPath]:
-    """BFS from start_node_id, tenant-scoped. Returns every simple path up
-    to max_hops. Deterministic: same graph state -> same paths, same order."""
+    # BFS from start_node_id, tenant-scoped. Returns every simple path up to max_hops. Deterministic: same graph state -> same paths, same order.
     edges = db.execute(select(GraphEdge).where(GraphEdge.tenant_id == tenant_id)).scalars().all()
     if relation_types:
         edges = [e for e in edges if e.relation_type in relation_types]
@@ -84,10 +74,7 @@ def traverse(
         return []
     dfs(start_node_id, [start_node.canonical_name], [], [], [], 0, {start_node_id})
 
-    # Multiple filings independently assert the same node/relation sequence
-    # (e.g. "Acme DESCRIBES Class B" appears once per filing that mentions
-    # it) -- that's correct evidence-wise, but for display it's the same
-    # *fact*. Dedupe by the (names, relations) shape, keeping first evidence.
+    # Multiple filings can assert the same fact; dedupe by node/relation shape while keeping the first evidence.
     seen = set()
     deduped: list[GraphPath] = []
     for p in completed:

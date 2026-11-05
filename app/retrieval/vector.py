@@ -1,9 +1,4 @@
-"""
-Vector retrieval layer (Postgres-only).
-
-pgvector HNSW ANN search (`embedding <=> :q` cosine distance) directly in SQL
--- tenant-scoped, top_k limited server-side.
-"""
+# Vector retrieval layer uses pgvector HNSW ANN search in SQL; tenant-scoped and top-k limited server-side.
 from __future__ import annotations
 from dataclasses import dataclass
 
@@ -52,8 +47,7 @@ def vector_search(db, tenant_id: str, query_embedding: list[float] | None, top_k
 
 
 def merge_hits(*hit_lists: list[VectorHit]) -> list[VectorHit]:
-    """Best-score merge across multiple vector searches (multi-query
-    expansion): keep each chunk's highest score, order by score desc."""
+    # Best-score merge across multiple vector searches (multi-query expansion): keep each chunk's highest score, order by score desc.
     best: dict[str, float] = {}
     for lst in hit_lists:
         for h in lst:

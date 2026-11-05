@@ -35,20 +35,18 @@ _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 @app.on_event("startup")
 def _startup():
     init_db()
-    # Load the cross-encoder reranker in the background so the first query
-    # doesn't pay the model load/download cost.
+    # Warm up the reranker in the background so the first query is not slowed by the model load.
     threading.Thread(target=warm_up, daemon=True).start()
 
 
 class QueryRequest(BaseModel):
     tenant_slug: str
     question: str
-    # optional scoping / tooling (all have safe defaults)
     company: str | None = None        # company name, ticker, or CIK
     form_type: str | None = None      # e.g. "10-K"
     date_from: str | None = None      # YYYY-MM-DD inclusive
     date_to: str | None = None        # YYYY-MM-DD inclusive
-    debug: bool = False               # include per-stage timings + retrieval detail
+    debug: bool = False               # include retrieval timings and debug details
 
 
 @app.get("/health")
@@ -127,13 +125,7 @@ def _resolve_filters(db, req: QueryRequest) -> dict:
 
 @app.post("/query")
 def query(req: QueryRequest):
-    """
-    Hybrid retrieval (lexical + vector -> RRF -> cross-encoder rerank ->
-    diversity pick) fused with graph traversal over entities implied in the
-    question, tenant-scoped end-to-end. Deterministic, citation-backed
-    answer. Optional company/form/date filters scope both retrievers;
-    debug=true returns per-stage timings and retrieval detail.
-    """
+    # Hybrid retrieval (lexical + vector -> RRF -> cross-encoder rerank -> diversity pick) fused with graph traversal over entities implied in the question, tenant-scoped end-to-end. Deterministic, citation-backed answer. Optional company/form/date filters scope both retrievers; debug=true returns per-stage timings and retrieval detail.
     ctx = resolve_tenant_by_slug(req.tenant_slug)
     tenant_id = ctx.tenant_id
     t0 = time.perf_counter()
@@ -152,8 +144,7 @@ def query(req: QueryRequest):
         lex_hits = lexical_search(db, tenant_id, req.question, TOP_K_CANDIDATES, filters=filters)
         vec_hits = vector_search(db, tenant_id, q_vec, TOP_K_CANDIDATES, filters=filters) if q_vec else []
 
-        # Multi-query expansion: when the question names companies, also run
-        # a company-anchored variant and keep each chunk's best score.
+        # When the query names companies, also score a company-anchored variant and keep the best result.
         variant_used = False
         if q_vec and plan.mentioned_companies:
             variant = " ".join(plan.mentioned_companies[:2]) + " " + req.question
@@ -171,7 +162,7 @@ def query(req: QueryRequest):
 
         graph_paths = []
         if plan.wants_graph_hop:
-            # Graph hops seed from companies explicitly named in the question.
+            # Seed graph hops from companies named in the question.
             seed_names = plan.mentioned_companies
             for name in seed_names:
                 node = find_node(db, tenant_id, "Company", name)
@@ -262,25 +253,13 @@ def graph_view(
     company: str | None = None,     # seed node label (or substring) to focus on
     limit: int = 300,               # max nodes returned, ranked by degree
 ):
-    """Node/edge payload for the UI's Graph view.
-
-    Tenant-scoped end-to-end. The whole tenant graph is small (~10^3 rows),
-    so filtering and degree ranking happen in Python rather than in SQL --
-    it keeps the logic readable and the response is one round trip.
-
-    Filtering order: relation -> company seed expansion -> node_type ->
-    top-N by degree (seed nodes are always kept so the view stays anchored)
-    -> edges induced on the surviving nodes.
-    """
+    # Node/edge payload for the UI's Graph view. Tenant-scoped end-to-end. The whole tenant graph is small (~10^3 rows), so filtering and degree ranking happen in Python rather than in SQL -- it keeps the logic readable and the response is one round trip. Filtering order: relation -> company seed expansion -> node_type -> top-N by degree (seed nodes are always kept so the view stays anchored) -> edges induced on the surviving nodes.
     ctx = resolve_tenant_by_slug(tenant_slug)
     limit = max(10, min(limit, 1000))
 
     with session_scope() as db:
         tid = ctx.tenant_id
-        # Company nodes are created from *text mentions* too (e.g. a filing's
-        # peer group), so the graph can hold companies you never ingested.
-        # Flag which ones are actually in the corpus so the UI can tell them
-        # apart instead of reporting "Company: 18" when you ingested 16.
+        # Company nodes can come from text mentions as well as ingested filings; flag which are actually in the corpus.
         corpus_names = {
             nm.casefold() for nm in db.execute(
                 select(Company.name)
@@ -312,7 +291,7 @@ def graph_view(
             ).scalars().all()
         ]
 
-    # Filter options reflect what this corpus actually contains.
+    # Filter options reflect the corpus that is actually present.
     node_type_counts: dict[str, int] = {}
     for n in nodes:
         node_type_counts[n["type"]] = node_type_counts.get(n["type"], 0) + 1
@@ -323,8 +302,7 @@ def graph_view(
     if relation:
         edges = [e for e in edges if e["relation"] == relation]
 
-    # Adjacency over the relation-filtered edge list (undirected: the UI draws
-    # both Company--FILED-->Filing and Person--HOLDS_ROLE-->Executive).
+    # Build an undirected adjacency map from the relation-filtered edge list for the UI.
     adjacency: dict[str, set[str]] = {}
     for e in edges:
         adjacency.setdefault(e["source"], set()).add(e["target"])
@@ -334,29 +312,23 @@ def graph_view(
     if company:
         q = company.strip().casefold()
         seeds = {n["id"] for n in nodes if q and q in n["label"].casefold()}
-        # Seed + its 2-hop neighbourhood, so "Apple" shows that company, its
-        # filings, its share classes and its officers -- not the whole corpus.
+        # Keep the seed and its 2-hop neighborhood so the view stays focused on the company and its nearby nodes.
         region, frontier = set(seeds), set(seeds)
         for _ in range(2):
             frontier = {nb for s in frontier for nb in adjacency.get(s, ())}
             region |= frontier
         nodes = [n for n in nodes if n["id"] in region]
     elif relation:
-        # A relation filter on its own should show that relation's shape, not
-        # 300 arbitrary nodes with two lonely edges between them.
+        # A relation filter should show that relation's structure, not a random slice of the corpus.
         nodes = [n for n in nodes if n["id"] in adjacency]
 
     if node_type:
         visible = {n["id"] for n in nodes if n["type"] == node_type}
-        # Seeds anchor the view even when they fall outside the type filter
-        # (otherwise "company=Apple & type=Filing" would show orphaned filings).
+        # Keep matching seeds even outside the node-type filter so they remain anchored in the view.
         visible |= seeds
         nodes = [n for n in nodes if n["id"] in visible]
 
-    # Induce the edge list on the visible nodes, then collapse parallel edges.
-    # The same assertion is stored once per filing that states it (4,351
-    # Company--DESCRIBES-->SecurityClass rows across ~72 real pairs), so the
-    # renderer should see one weighted arc, not thousands of duplicates.
+    # Collapse parallel edges after inducing the visible subgraph.
     def _induce_and_collapse(edges: list[dict], ids: set[str]) -> list[dict]:
         merged: dict[tuple[str, str, str], dict] = {}
         for e in edges:
@@ -381,7 +353,7 @@ def graph_view(
         degree[e["target"]] += 1
 
     if len(nodes) > limit:
-        # Keep seeds + Company anchors, then fill the rest by degree.
+        # Keep seed and company anchors, then fill the rest by degree.
         keep = set(seeds) | {n["id"] for n in nodes if n["type"] == "Company"}
         ranked = sorted((n for n in nodes if n["id"] not in keep),
                         key=lambda n: (-degree[n["id"]], n["label"]))
@@ -414,9 +386,7 @@ def graph_view(
 @app.get("/compare")
 def compare(company_a: str, company_b: str, tenant_slug: str,
             form_type: str = "10-K", section: str | None = None, limit: int = 20):
-    """Side-by-side sections from each company's latest filing of form_type
-    (shared headings only) -- companion to the graph's PEER_OF edges for
-    peer-anchored questions. Snippets are the first chunk of each section."""
+    # Side-by-side sections from each company's latest filing of form_type (shared headings only) -- companion to the graph's PEER_OF edges for peer-anchored questions. Snippets are the first chunk of each section.
     ctx = resolve_tenant_by_slug(tenant_slug)
     with session_scope() as db:
         tid = ctx.tenant_id
@@ -441,8 +411,7 @@ def compare(company_a: str, company_b: str, tenant_slug: str,
             ).all()
             secs: dict[str, tuple[str, str]] = {}
             for heading, body in rows:
-                # Normalize so "Item 1A.\xa0\xa0\xa0\xa0Risk Factors" (Apple,
-                # non-breaking spaces) matches "Item 1A. Risk Factors" (peer).
+                # Normalize spaces and punctuation so section headings match across filings.
                 key = re.sub(r"\s+", " ", heading or "Document").strip().rstrip(".").casefold()
                 secs.setdefault(key, (heading or "Document", body))
             return filing, secs
@@ -479,10 +448,7 @@ def compare(company_a: str, company_b: str, tenant_slug: str,
 @app.get("/facts")
 def company_facts(ticker: str, tag: str | None = None, unit: str | None = None,
                   tenant_slug: str = "sec"):
-    """Structured XBRL facts from SEC's companyfacts API (cached in
-    .sec_cache). tag=None lists available us-gaap tags; with a tag, returns
-    the most recent reported values -- exact numbers for the questions that
-    prose retrieval can only approximate."""
+    # Structured XBRL facts from SEC's companyfacts API (cached in .sec_cache). tag=None lists available us-gaap tags; with a tag, returns the most recent reported values -- exact numbers for the questions that prose retrieval can only approximate.
     resolve_tenant_by_slug(tenant_slug)
     try:
         cik = resolve_cik(ticker)
@@ -514,6 +480,5 @@ def company_facts(ticker: str, tag: str | None = None, unit: str | None = None,
                         "form": r.get("form"), "val": r.get("val")} for r in recent]}
 
 
-# Static UI, mounted last so it never shadows the API routes above.
-# "/" serves frontend/index.html (html=True) -> open http://127.0.0.1:8000/.
+# Mount the static UI last so it does not shadow the API routes.
 app.mount("/", StaticFiles(directory=str(BASE_DIR / "frontend"), html=True), name="frontend")

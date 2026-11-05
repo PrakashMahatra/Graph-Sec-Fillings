@@ -1,9 +1,4 @@
-"""Weighted Reciprocal Rank Fusion (RRF) of lexical + vector rankings.
-
-RRF is used (rather than e.g. averaging raw scores) because BM25 scores and
-cosine similarities live on incomparable scales -- RRF only needs each
-list's *rank order*, which sidesteps that problem entirely.
-"""
+# Weighted Reciprocal Rank Fusion (RRF) of lexical and vector rankings.
 from __future__ import annotations
 from dataclasses import dataclass
 

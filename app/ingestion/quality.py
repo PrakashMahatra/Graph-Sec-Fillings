@@ -1,22 +1,13 @@
-"""
-Quality flags for ingested text.
-
-Rule: never silently "fix" a number. `l0%` (lowercase L, likely OCR
-mis-read of `10%`) stays `l0%` verbatim in `chunks.text`; we only ever
-*flag* it in `quality_flags` so a human/consumer can decide, and we treat
-any chunk carrying a numeric flag as high-risk evidence for financial
-claims.
-"""
+# Quality flags keep suspicious OCR-like numeric text verbatim while marking it as risky evidence.
 from __future__ import annotations
 import hashlib
 import re
 
-# Patterns that look like a digit got OCR'd into a lookalike letter next to
-# other digits/%/$ context -- e.g. "l0%", "1O,000", "S1,200" for "$1,200".
+# OCR can flip digits into lookalike letters in numeric contexts, e.g. l0%, 1O,000, or S1,200.
 _OCR_SUSPECT_PATTERNS = [
-    re.compile(r"\bl\d[\d,.]*%"),        # l0%  (l instead of 1)
-    re.compile(r"\b\d*[Oo]\d[\d,.]*\b"), # 1O,000 (O instead of 0)
-    re.compile(r"\bS\d[\d,]*\b"),        # S1,200 (S instead of $)
+    re.compile(r"\bl\d[\d,.]*%"),        # l0%: l instead of 1.
+    re.compile(r"\b\d*[Oo]\d[\d,.]*\b"), # 1O,000: O instead of 0.
+    re.compile(r"\bS\d[\d,]*\b"),        # S1,200: S instead of $.
 ]
 
 _MOJIBAKE_PATTERN = re.compile(r"[\ufffd\x00-\x08\x0b\x0c\x0e-\x1f]")

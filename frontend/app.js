@@ -1,8 +1,7 @@
-/* FilingLens UI — vanilla JS, no build step. All rendering escapes user/API
-   text via esc() to avoid HTML injection from filing snippets. */
+// FilingLens UI: vanilla JS, no build step, with escaped rendering for API and user text.
 const API = location.protocol === "file:" ? "http://localhost:8000" : "";
 
-// Example questions per corpus, so the demo always asks something answerable.
+// Example questions per corpus so the demo always asks something answerable.
 const CHIPS = {
   sec: [
     "What are the risk factors disclosed by Apple?",
@@ -32,7 +31,7 @@ function fmtNum(n) {
     : Math.abs(n) >= 1e3 ? (n / 1e3).toFixed(1) + "K" : String(n);
 }
 
-/* ---------- tabs ---------- */
+// tabs
 document.querySelectorAll(".tab").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".tab").forEach(b => {
@@ -48,7 +47,7 @@ document.querySelectorAll(".tab").forEach(btn => {
   });
 });
 
-/* ---------- tenants ---------- */
+// tenants
 function chipsFor(t) { return CHIPS[t] || CHIPS.sec; }
 
 function renderChips() {
@@ -73,10 +72,9 @@ async function loadTenants() {
     if (!res.ok) throw new Error("HTTP " + res.status);
     tenantsCache = await res.json();
     slugs = tenantsCache.map(t => t.slug);
-    // annotate names into option labels
+    // Annotate names into the option labels.
     for (const id of ["tenant", "g-tenant"]) {
       const sel = $(id);
-      // Default to the main corpus, not whichever slug sorts first.
       const cur = sel.value || (slugs.includes("sec") ? "sec" : slugs[0]);
       sel.innerHTML = tenantsCache.map(t =>
         '<option value="' + esc(t.slug) + '"' + (t.slug === cur ? " selected" : "") + ">" +
@@ -96,7 +94,7 @@ $("tenant").addEventListener("change", () => { renderChips(); $("out").innerHTML
 $("g-tenant").addEventListener("change", () => { graphLoaded = false; });
 $("g-focus").addEventListener("keydown", e => { if (e.key === "Enter") loadGraph(); });
 
-/* ---------- ASK ---------- */
+// ask
 function useq(el) { $("q").value = el.textContent.trim(); ask(); }
 
 async function ask() {
@@ -116,7 +114,7 @@ async function ask() {
         question,
         company: $("company").value.trim() || null,
         form_type: $("form").value || null,
-        debug: true,   // drives the Explain + Scout panels below
+        debug: true,
       }),
     });
     if (!res.ok) throw new Error("HTTP " + res.status + " — " + (await res.text()).slice(0, 240));
@@ -132,7 +130,7 @@ async function ask() {
   btn.disabled = false;
 }
 
-/* ---------- ANSWER RENDERING ---------- */
+// answer rendering
 function renderAnswer(out, d) {
   document.getElementById("mode").textContent = d.generation_mode || "";
   const cited = new Set(d.citation_ids || []);
@@ -148,7 +146,7 @@ function renderAnswer(out, d) {
       points.map(p => "<li>" + esc(p) + "</li>").join("") + "</ul>";
   }
 
-  // "Why this answer" — the plan the engine followed, in one line.
+  // The plan the engine followed.
   if (d.plan) {
     const p = d.plan;
     const bits = [];
@@ -161,7 +159,7 @@ function renderAnswer(out, d) {
       h += '<div class="plan">Why this answer: ' + esc(bits.join(" Â· ")) + "</div>";
   }
 
-  // Retrieval detail (debug=true is always sent by this UI).
+  // Retrieval detail from the server debug payload.
   if (d.debug) {
     const t = d.debug.timings_ms || {};
     const rows = [
@@ -182,7 +180,7 @@ function renderAnswer(out, d) {
   }
   h += "</div>";
 
-  // Scout — where did the ranked list come from? top-2 evidence cards.
+  // Scout: top two evidence cards from the ranked list.
   const sampled = sampledScout(d);
   if (sampled.length) {
     h += '<div class="card"><h2>Scout — strongest supporting evidence</h2>' +
@@ -209,7 +207,7 @@ function renderAnswer(out, d) {
   out.innerHTML = h;
 }
 
-// The top cited cards first, then the rest — max 2, as a "proof trail".
+// Show the top cited cards first, then the rest, capped at two.
 function sampledScout(d) {
   if (!d.citations || !d.citations.length) return [];
   const have = new Set(d.citation_ids || []);
@@ -242,9 +240,7 @@ document.getElementById("q").addEventListener("keydown", e => {
 });
 
 
-/* ---------- GRAPH ----------
-   A hand-rolled force layout drawn straight onto <canvas>: no library, no
-   build step, nothing to install -- matching the rest of this UI. */
+// Graph: hand-rolled force layout on canvas with no library or build step.
 const TYPE_COLORS = {
   Company: "#2563eb", "Peer mention": "#93c5fd", SecurityClass: "#7c3aed",
   Filing: "#0d9488", Person: "#db2777", Executive: "#ea580c",
@@ -267,8 +263,7 @@ function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 function gRadius(n) { return 6 + Math.min(16, 4 * Math.sqrt(n.degree || 0)); }
-// A Company node you actually ingested vs. one only named in a filing's peer
-// group -- both belong in the graph, but only the first is one of "your" N.
+// Distinguish ingested companies from peer mentions without changing the graph model.
 function gKind(n) {
   return (n.type === "Company" && n.in_corpus === false) ? "Peer mention" : n.type;
 }
@@ -396,7 +391,7 @@ function renderNodeDetail(node) {
     "</div>";
 }
 
-/* --- layout: seed positions, fit-to-view, and a plain force simulation --- */
+// layout: seed positions, fit-to-view, and the force simulation
 function gSeed() {
   const N = G.nodes.length;
   if (!N) return;
@@ -441,7 +436,7 @@ function gStep() {
       let d2 = dx * dx + dy * dy;
       if (d2 < 1) { dx = ((i * 31 + j * 17) % 13) - 6 || 1; dy = ((i * 17 + j * 29) % 11) - 5 || 1; d2 = dx * dx + dy * dy; }
       const d = Math.sqrt(d2);
-      // Floor the distance so overlapping nodes can't produce a runaway force.
+      // Floor the distance to avoid runaway forces from overlapping nodes.
       const f = a * rep / Math.max(d2, 64);
       const ux = dx / d, uy = dy / d;
       p.vx -= ux * f; p.vy -= uy * f;
@@ -482,7 +477,7 @@ function gLoop() {
   if (G.alpha > 0.02) G.raf = requestAnimationFrame(gLoop);
 }
 
-/* --- rendering --- */
+// rendering
 function gDraw() {
   const c = $("g-canvas");
   if (!c || !G.w) return;
@@ -514,7 +509,7 @@ function gDraw() {
     ctx.lineWidth = 1 + Math.min(3.5, Math.log10(1 + cnt) * 1.4);
     ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
 
-    const ah = 4 + Math.min(5, Math.log10(1 + cnt) * 2.5);   // arrowhead
+    const ah = 4 + Math.min(5, Math.log10(1 + cnt) * 2.5);
     ctx.fillStyle = col;
     ctx.beginPath();
     ctx.moveTo(x2 + ux * 2, y2 + uy * 2);
@@ -553,7 +548,7 @@ function gDraw() {
   ctx.globalAlpha = 1;
 }
 
-/* --- interaction --- */
+// interaction
 function gXY(e) {
   const r = $("g-canvas").getBoundingClientRect();
   return { x: e.clientX - r.left, y: e.clientY - r.top };

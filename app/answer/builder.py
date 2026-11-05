@@ -1,14 +1,4 @@
-"""
-Evidence-first answer assembly.
-
-The deterministic citation-backed answer is built first and is ALWAYS
-returned as-is, whether or not a local LLM is configured. If `USE_OLLAMA`
-is on, a local model is given that same evidence and asked only to
-smooth the prose -- it cannot introduce a claim that isn't already in the
-`facts`/`citations` payload, and if Ollama is unreachable the deterministic
-answer is what the caller gets anyway. This is the "system stays useful
-with the LLM turned off" requirement from the spec.
-"""
+# Evidence-first answer assembly keeps the deterministic citation-backed answer as the primary output.
 from __future__ import annotations
 import json
 import logging
@@ -134,13 +124,7 @@ def build_answer(db, tenant_id: str, question: str, fused_hits: list[FusedHit],
 
 
 def _try_gemini_structured(payload: AnswerPayload) -> dict | None:
-    """Optional Gemini answer synthesis via plain REST (no SDK).
-
-    Returns {summary, key_points, citation_ids} grounded ONLY in the
-    numbered evidence below, or None on ANY failure (bad key, quota,
-    network, malformed JSON) -- the deterministic answer then stands, so
-    the API can never break because of the LLM.
-    """
+    # Optional Gemini answer synthesis via plain REST (no SDK). Returns {summary, key_points, citation_ids} grounded ONLY in the numbered evidence below, or None on ANY failure (bad key, quota, network, malformed JSON) -- the deterministic answer then stands, so the API can never break because of the LLM.
     evidence = []
     for i, c in enumerate(payload.citations, 1):
         evidence.append(
@@ -218,8 +202,7 @@ def _try_gemini_structured(payload: AnswerPayload) -> dict | None:
 
 
 def _try_ollama_polish(payload: AnswerPayload) -> str | None:
-    """Optional. Local-only, zero-cost. Never trusted as the source of any
-    fact -- it's only allowed to rephrase what's already in `payload`."""
+    # Optional. Local-only, zero-cost. Never trusted as the source of any fact -- it's only allowed to rephrase what's already in `payload`.
     prompt = (
         "Rewrite the following evidence-backed findings as clear prose for "
         "a financial analyst. Do NOT add any fact, number, or claim that is "

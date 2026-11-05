@@ -1,15 +1,4 @@
-"""Post-fusion candidate selection: cross-encoder reranking + diversity.
-
-RRF only sees rank *order* from two weak scorers (ts_rank and cosine). A
-cross-encoder reads each (query, chunk) pair jointly and re-scores it -- the
-standard quality step for hybrid RAG. `ms-marco-MiniLM-L-6-v2` (~80MB) ships
-inside the existing sentence-transformers dependency, runs on GPU/CPU, and
-loads lazily; if it can't load (offline/disk) retrieval keeps RRF order.
-
-After reranking, `select_final` greedily drops near-duplicate candidates
-(cosine >= MAX_SIM to an already-picked chunk) so sibling chunks overlapping
-by 40 tokens don't burn multiple top-k slots on the same content.
-"""
+# Post-fusion candidate selection uses cross-encoder reranking plus diversity filtering.
 from __future__ import annotations
 
 import logging
@@ -42,15 +31,13 @@ def _get_cross_encoder():
 
 
 def warm_up() -> None:
-    """Load the cross-encoder in the background at startup so the first query
-    doesn't pay the model load/download cost."""
+    # Load the cross-encoder in the background at startup so the first query doesn't pay the model load/download cost.
     if RERANK_ENABLED:
         _get_cross_encoder()
 
 
 def rerank(query: str, hits: list, texts: dict[str, str]) -> list:
-    """Reorder hits by cross-encoder relevance (input order breaks ties).
-    Returns input order unchanged if disabled/unavailable/predict fails."""
+    # Reorder hits by cross-encoder relevance (input order breaks ties). Returns input order unchanged if disabled/unavailable/predict fails.
     if not RERANK_ENABLED or len(hits) < 2:
         return hits
     ce = _get_cross_encoder()
@@ -66,9 +53,7 @@ def rerank(query: str, hits: list, texts: dict[str, str]) -> list:
 
 
 def select_final(db, tenant_id: str, query: str, pool: list, top_k: int) -> list:
-    """Final top-k from the fused pool: fetch chunk texts/embeddings in one
-    query, rerank by cross-encoder, then greedily pick while staying under
-    MAX_SIM against already-picked chunks. Returns FusedHit list."""
+    # Final top-k from the fused pool: fetch chunk texts/embeddings in one query, rerank by cross-encoder, then greedily pick while staying under MAX_SIM against already-picked chunks. Returns FusedHit list.
     if not pool:
         return []
     rows = db.execute(

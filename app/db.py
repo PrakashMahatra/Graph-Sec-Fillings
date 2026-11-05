@@ -14,23 +14,16 @@ def get_engine():
 
 def init_db():
     from app import models  # noqa: F401  (register models on Base.metadata)
-    # Extensions MUST exist before create_all (chunks.embedding needs the
-    # `vector` type); pgcrypto backs gen_random_uuid() defaults.
+    # Extensions must exist before create_all; chunks.embedding needs the vector type and pgcrypto backs gen_random_uuid().
     _run_pg("CREATE EXTENSION IF NOT EXISTS vector")
     _run_pg("CREATE EXTENSION IF NOT EXISTS pgcrypto")
-    # Tables, columns, computed columns and *every* index (HNSW, GIN, btree)
-    # are declared in app/models.py -- a single source of truth -- so a fresh
-    # database is built entirely from code, not from SQL strings in here.
+    # app/models.py is the single source of truth for schema and index definitions.
     models.Base.metadata.create_all(engine)
     _ensure_row_level_security()
 
 
 def _run_pg(stmt: str) -> None:
-    """Run one DDL statement in its own transaction. PostgreSQL aborts the
-    entire transaction on error, so isolating each statement means one
-    failure can't poison the rest. All statements here are idempotent, so a
-    skip is benign; genuine failures (e.g. missing permissions) are surfaced
-    as a one-line warning instead of a silent `pass`."""
+    # Run one DDL statement in its own transaction. PostgreSQL aborts the entire transaction on error, so isolating each statement means one failure can't poison the rest. All statements here are idempotent, so a skip is benign; genuine failures (e.g. missing permissions) are surfaced as a one-line warning instead of a silent `pass`.
     try:
         with engine.begin() as conn:
             conn.execute(text(stmt))
@@ -39,19 +32,10 @@ def _run_pg(stmt: str) -> None:
 
 
 def _ensure_row_level_security():
-    """Enable row-level security and create tenant-isolation policies,
-    idempotently, safe to run on every startup.
-
-    `CREATE EXTENSION` and RLS policies are the only DDL here because they
-    are the only DDL that SQLAlchemy has no declarative representation for --
-    tables, columns, computed columns and indexes all live in app/models.py
-    and are created by create_all(). Mirrors db/init.sql (which the docker
-    entrypoint runs on first volume init).
-    """
+    # Enable row-level security and create tenant-isolation policies, idempotently, safe to run on every startup. `CREATE EXTENSION` and RLS policies are the only DDL here because they are the only DDL that SQLAlchemy has no declarative representation for -- tables, columns, computed columns and indexes all live in app/models.py and are created by create_all(). Mirrors db/init.sql (which the docker entrypoint runs on first volume init).
     rls_tables = ["filings", "documents", "sections", "chunks", "graph_nodes", "graph_edges"]
     with engine.begin() as conn:
-        # CREATE POLICY has no IF NOT EXISTS in PostgreSQL -- pre-check the
-        # catalog so an already-configured database stays quiet.
+        # PostgreSQL policies have no IF NOT EXISTS check, so preflight the catalog to avoid duplicate policy errors.
         policies = {
             row[0]
             for row in conn.execute(
@@ -62,8 +46,7 @@ def _ensure_row_level_security():
         _run_pg(f"ALTER TABLE {t} ENABLE ROW LEVEL SECURITY")  # no-op if on
         if f"tenant_isolation_{t}" in policies:
             continue
-        # Permissive when app.tenant_id is unset (ingestion/migrations run
-        # without tenant context); enforcing once SET LOCAL is used.
+        # Ingestion runs without tenant context, so this policy stays permissive until SET LOCAL is used.
         _run_pg(
             f"CREATE POLICY tenant_isolation_{t} ON {t} "
             f"USING (current_setting('app.tenant_id', true) = '' "

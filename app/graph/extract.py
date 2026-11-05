@@ -1,23 +1,4 @@
-"""
-Rule-based entity/relation extraction over chunk text.
-
-This is the part of the spec that matters most: "The graph MUST be
-evidence-backed. Do not create a relationship only because an LLM inferred
-it." So extraction here is regex/pattern-based against governance-disclosure
-language (which is fairly formulaic in 10-Ks/S-1s), and every extracted fact
-carries the exact matched span as its evidence. No generative model writes
-to the graph in this system.
-
-Patterns cover the relations named in the spec:
-  Company --FILED--> Filing
-  Filing --DESCRIBES--> SecurityClass
-  SecurityClass --HAS_VOTING_RIGHTS--> GovernanceEvent (votes-per-share fact)
-  Person --HOLDS_ROLE--> BoardMember / Executive
-  Shareholder --OWNS--> SecurityClass
-  Company --PEER_OF--> Company
-  Filing --SUPERSEDES--> Filing   (handled at ingest time from filing dates,
-                                    not text extraction)
-"""
+# Rule-based entity/relation extraction over chunk text; graph facts are evidence-backed and pattern-based, not generated.
 from __future__ import annotations
 import re
 from dataclasses import dataclass
@@ -34,19 +15,19 @@ class ExtractedFact:
     properties: dict
 
 
-# "Class A common stock" / "Class B Common Stock" / "Series A Preferred Stock"
+# Security class examples: "Class A common stock" and "Series A Preferred Stock".
 _SECURITY_CLASS_RE = re.compile(
     r"\bClass\s+([A-Z])\s+(?:Common|Preferred)\s+Stock\b", re.IGNORECASE
 )
 
-# "each share of Class B common stock is entitled to 10 votes"
+# Voting-rights example: "each share of Class B common stock is entitled to 10 votes".
 _VOTES_PER_SHARE_RE = re.compile(
     r"(Class\s+[A-Z]\s+(?:Common|Preferred)\s+Stock)[^.]{0,80}?"
     r"entitled to\s+([\d,]+)\s+votes?",
     re.IGNORECASE,
 )
 
-# "John Smith, our Chief Executive Officer" / "Jane Doe serves as a director"
+# Role examples: "John Smith, our Chief Executive Officer" and "Jane Doe serves as a director".
 _ROLE_RE = re.compile(
     r"\b([A-Z][a-z]+(?:\s[A-Z]\.)?\s[A-Z][a-z]+)\s*,?\s*"
     r"(?:our|the Company's)?\s*"
@@ -54,14 +35,14 @@ _ROLE_RE = re.compile(
     r"President|director|Director|board member)\b"
 )
 
-# "Jane Doe beneficially owns approximately 42% of our Class B common stock"
+# Ownership example: "Jane Doe beneficially owns approximately 42% of our Class B common stock".
 _OWNERSHIP_RE = re.compile(
     r"\b([A-Z][a-zA-Z.&, ]{2,60}?)\s+beneficially owns?\s+(?:approximately\s+)?"
     r"([\d.]+)%\s+of\s+(?:our\s+)?(Class\s+[A-Z]\s+(?:Common|Preferred)\s+Stock)",
     re.IGNORECASE,
 )
 
-# "our peer group includes Beta Industries, Gamma Corp and Delta Inc"
+# Peer-group example: "our peer group includes Beta Industries, Gamma Corp and Delta Inc".
 _PEER_RE = re.compile(
     r"peer group (?:includes|consists of)\s+([^.]+)\.", re.IGNORECASE
 )
@@ -130,15 +111,7 @@ def extract_facts(text: str, self_company_name: str) -> list[ExtractedFact]:
 
 
 def _clean_peer_name(raw: str) -> str:
-    """Peer lists often come out of a sentence like
-
-        "our peer group includes the following companies: Moody's
-         Corporation, CME Group Inc."
-
-    Splitting on commas leaves "the following companies: Moody's Corporation"
-    -- a clause, not a company. Keep only the text after the final ':' and
-    drop anything implausibly long, so the graph stores a company name.
-    """
+    # Peer lists often come out of a sentence like "our peer group includes the following companies: Moody's Corporation, CME Group Inc." Splitting on commas leaves "the following companies: Moody's Corporation" -- a clause, not a company. Keep only the text after the final ':' and drop anything implausibly long, so the graph stores a company name.
     name = re.sub(r"\s+", " ", raw).strip(" .,;")
     if ":" in name:
         name = name.rsplit(":", 1)[-1].strip(" .,;")

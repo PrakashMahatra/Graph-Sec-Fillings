@@ -1,22 +1,4 @@
-"""Retrieval-quality evaluation over a golden question set.
-
-Corpus: the 16-company lineup (S&P100 top-10 + AMD/INTC/PLTR/ORCL/MU +
-S&P Global) ingested from scripts/tickers_top16.txt -- see GOLDEN below.
-Each entry = question, companies whose filings SHOULD be cited (ground
-truth), and lowercase keyword stems that must appear in the evidence
-(section heading, citation snippet, or answer text).
-
-Metrics:
-  company_hit@8 -- fraction of questions where a citation from an expected
-                   company (with a matching keyword) appears in the top-8
-  mrr           -- mean reciprocal rank of that first correct citation
-  avg_citations -- mean citations returned (coverage sanity check)
-
-Two ways to run:
-  1. Standalone against a running server:
-       python scripts/eval_rag.py --base-url http://127.0.0.1:8000
-  2. In-process via tests/test_eval.py (pytest, asserts thresholds).
-"""
+# Retrieval-quality evaluation over a golden question set. Corpus: the 16-company lineup (S&P100 top-10 + AMD/INTC/PLTR/ORCL/MU + S&P Global) ingested from scripts/tickers_top16.txt -- see GOLDEN below. Each entry = question, companies whose filings SHOULD be cited (ground truth), and lowercase keyword stems that must appear in the evidence (section heading, citation snippet, or answer text). Metrics: company_hit@8 -- fraction of questions where a citation from an expected company (with a matching keyword) appears in the top-8 mrr -- mean reciprocal rank of that first correct citation avg_citations -- mean citations returned (coverage sanity check) Two ways to run: 1. Standalone against a running server: python scripts/eval_rag.py --base-url http://127.0.0.1:8000 2. In-process via tests/test_eval.py (pytest, asserts thresholds).
 from __future__ import annotations
 
 import argparse
