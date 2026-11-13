@@ -5,6 +5,8 @@ proxy statements, etc.), built to answer questions plain vector search can't:
 
 > "Trace how the voting share structure of Acme Holdings changed across its
 > last three filings relative to its peer group."
+<img width="1916" height="857" alt="filing_2" src="https://github.com/user-attachments/assets/b2f7918c-dfc4-4000-911a-f4440f364c64" />
+<img width="1177" height="870" alt="filing_3" src="https://github.com/user-attachments/assets/a23cf663-3d57-45ac-8eb7-48218544e35e" />
 
 Combines **lexical search + vector search + knowledge-graph traversal +
 temporal reasoning**, with every answer backed by a filing/section/page
@@ -17,6 +19,7 @@ how a real financial-data platform is built: idempotent ingestion, quality
 flags on OCR'd numbers, an evidence-backed knowledge graph (not
 LLM-hallucinated edges), tenant isolation enforced server-side, and answers
 that are deterministic and citable rather than free-form LLM prose.
+<img width="1187" height="871" alt="filing_1" src="https://github.com/user-attachments/assets/38434a5c-a4da-4a27-b8ca-c645a664813d" />
 
 ## Two ways to run it
 
